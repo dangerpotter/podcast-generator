@@ -1,0 +1,35 @@
+# Generated artifacts and large local caches
+models/
+output/
+.tools/
+
+# Capella-proprietary content (course exports, example reports, logo) —
+# excluded from the public repo; drop your own copies in locally.
+samples/*
+!samples/.gitkeep
+assets/*.png
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local-only Claude Code settings and runtime state
+.claude/settings.local.json
+.claude/*.lock
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+~$*.docx
