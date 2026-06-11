@@ -140,6 +140,109 @@ def cmd_regen(cfg, args):
         cmd_podcasts(cfg, args)
 
 
+def cmd_doctor(cfg, args):
+    """Check all dependencies and the model cache, then print a status report."""
+    import importlib
+
+    checks_ok = True
+    any_warnings = False
+
+    def _ok(msg):
+        print(f"  OK   {msg}")
+
+    def _warn(msg):
+        nonlocal any_warnings
+        any_warnings = True
+        print(f"  WARN {msg}")
+
+    def _fail(msg):
+        nonlocal checks_ok
+        checks_ok = False
+        print(f"  FAIL {msg}")
+
+    def _info(msg):
+        print(f"  .... {msg}")
+
+    # Python version
+    pv = sys.version_info
+    if pv >= (3, 10):
+        _ok(f"Python {pv.major}.{pv.minor}.{pv.micro}")
+    else:
+        _fail(f"Python {pv.major}.{pv.minor}.{pv.micro} — Python 3.10+ required")
+
+    # llama-cpp-python
+    try:
+        lc = importlib.import_module("llama_cpp")
+        ver = getattr(lc, "__version__", "installed")
+        _ok(f"llama-cpp-python {ver}")
+    except ImportError:
+        _fail(
+            "llama-cpp-python not installed or failed to load its native extension.\n"
+            "       Install with:  pip install llama-cpp-python\n"
+            "       Prebuilt CPU wheel (no compiler needed):\n"
+            "         pip install llama-cpp-python "
+            "--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu\n"
+            "       CUDA wheel: https://github.com/abetlen/llama-cpp-python/releases"
+        )
+
+    # kokoro
+    try:
+        kok = importlib.import_module("kokoro")
+        ver = getattr(kok, "__version__", "installed")
+        _ok(f"kokoro {ver}")
+    except ImportError:
+        _fail("kokoro not installed.  Install with:  pip install 'kokoro>=0.9.2'")
+
+    # espeak-ng (warn, not fail — summaries/scripts work without it)
+    try:
+        from .tts import TTSDependencyError, ensure_espeak
+        ensure_espeak()
+        _ok("espeak-ng found (podcast generation ready)")
+    except TTSDependencyError as e:
+        _warn(f"espeak-ng not found — podcast (MP3) generation will fail.\n       {e}")
+
+    # RAM
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        avail_gb = mem.available / 1024 ** 3
+        total_gb = mem.total / 1024 ** 3
+        req_gb = 12.0 if cfg.llm.model == "12b" else 8.0
+        if avail_gb >= req_gb:
+            _ok(f"RAM {avail_gb:.1f} GB free / {total_gb:.1f} GB total")
+        else:
+            _warn(
+                f"RAM {avail_gb:.1f} GB free / {total_gb:.1f} GB total — "
+                f"the {cfg.llm.model} model wants ~{req_gb:.0f} GB free.\n"
+                f"       Switch model:  capella-podcast --model e4b <command>"
+            )
+    except ImportError:
+        _info("psutil unavailable — RAM check skipped")
+
+    # Model cache
+    from .llm import _is_main_gguf
+    cache_dir = cfg.resolve(cfg.llm.cache_dir)
+    if cache_dir and cache_dir.is_dir():
+        ggufs = sorted(p for p in cache_dir.rglob("*.gguf") if _is_main_gguf(p.name))
+        if ggufs:
+            for g in ggufs:
+                size_gb = g.stat().st_size / 1024 ** 3
+                _ok(f"Cached model: {g.name} ({size_gb:.1f} GB)")
+        else:
+            _info(f"Model cache at {cache_dir} is empty — will download on first generation run")
+    else:
+        _info(f"Model cache directory not created yet — will be created on first run")
+
+    print()
+    if checks_ok and not any_warnings:
+        print("All checks passed — ready to run.")
+    elif checks_ok:
+        print("Ready, with warning(s) noted above.")
+    else:
+        print("One or more required checks FAILED — see messages above.")
+        sys.exit(1)
+
+
 def cmd_gui(cfg, args):
     from .gui.server import run
 
@@ -209,6 +312,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--port", type=int, default=8765, help="port to serve on (default: 8765)")
     sp.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     sp.set_defaults(func=cmd_gui)
+
+    sp = sub.add_parser("doctor", help="check all dependencies and model cache (run this first if anything seems broken)")
+    sp.set_defaults(func=cmd_doctor)
     return p
 
 

@@ -23,9 +23,13 @@ STAGES = {
 STAGE_ORDER = ("summaries", "scripts", "podcasts")
 
 
-def do_ingest(cfg: AppConfig, course_json: Path) -> dict:
+def do_ingest(
+    cfg: AppConfig,
+    course_json: Path,
+    force_course_type: str | None = None,
+) -> dict:
     """Stage 1, run synchronously (fast). Raises CourseTypeError on bad input."""
-    ing = ingest_mod.ingest(course_json)
+    ing = ingest_mod.ingest(course_json, force_course_type=force_course_type)
     out = ingest_mod.write_structure(ing, cfg.resolve(cfg.output_dir))
     course = ing.structure["course"]
     manifest.record(

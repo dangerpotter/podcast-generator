@@ -55,13 +55,6 @@ def detect_course_type(course: dict) -> CourseType:
         return GP
     if design == "FLEX_PATH2" and flex is True:
         return FPX
-    if design is None and flex is None:
-        raise CourseTypeError(
-            "The file's 'course' section has neither courseDesignModelType nor "
-            "flexPathAny, so the course model cannot be determined. This is "
-            "usually not the full course content export; re-export the course "
-            "from the curriculum tool and pick that JSON."
-        )
     raise CourseTypeError(
         f"Cannot determine course model: courseDesignModelType={design!r}, "
         f"flexPathAny={flex!r}. Expected GUIDED_PATH2/false (Guided Path) or "
@@ -188,42 +181,221 @@ def _parse_activity(
     }
 
 
-def ingest(course_json_path: Path | str) -> Ingested:
-    """Parse a Capella export into the intermediate structure (in memory).
+def _detect_format(data: dict) -> str:
+    """Return 'compass' for a Course Compass export, 'standard' for the normal export."""
+    if "syllabusContent" in data and "unitContent" in data:
+        return "compass"
+    return "standard"
 
-    Two export formats are accepted: the curriculum export (top-level
-    ``course``/``units``/``activities``) and the flat course content export
-    (top-level ``syllabusContent``/``unitContent``/``courseResources``).
+
+def _extract_compass_course_meta(data: dict) -> tuple[str | None, str | None]:
+    """Return (course_number, course_name) from a Course Compass export."""
+    opening = (
+        ((data.get("syllabusContent") or {}).get("courseOverview") or {}).get("openingLanguage") or ""
+    ).strip()
+    m = re.search(
+        r'course[,\s]+([A-Z][A-Z0-9-]{3,})\s*[-–]\s*([^,\n]+)',
+        opening,
+        re.IGNORECASE,
+    )
+    if m:
+        return m.group(1).upper(), m.group(2).strip()
+    return None, None
+
+
+def _detect_course_type_compass(data: dict) -> CourseType:
+    """Infer GP/FPX from the course number embedded in the Compass overview."""
+    number, _ = _extract_compass_course_meta(data)
+    if number and "FPX" in number.upper():
+        return FPX
+    raise CourseTypeError(
+        "Cannot determine course model from Course Compass export. "
+        "Select 'Guided Path' or 'FlexPath' from the Course model dropdown."
+    )
+
+
+def _ingest_compass_format(
+    data: dict,
+    force_course_type: str | None,
+    warnings: list[str],
+) -> tuple[CourseType, dict, list[dict]]:
+    """Parse a Course Compass export into the shared intermediate structure."""
+    if force_course_type == "GP":
+        ctype = GP
+    elif force_course_type == "FPX":
+        ctype = FPX
+    else:
+        ctype = _detect_course_type_compass(data)
+
+    number, name = _extract_compass_course_meta(data)
+
+    syllabus = data.get("syllabusContent") or {}
+    unit_content = data.get("unitContent") or {}
+    scoring_content = data.get("scoringGuideContent") or {}
+
+    competencies = (syllabus.get("courseCompetencies") or {}).get("competencies") or []
+
+    grading = syllabus.get("courseGrading") or {}
+    assess_list = grading.get("assessments") or []
+    if not assess_list:
+        warnings.append("no assessments found in syllabusContent.courseGrading")
+
+    modules: list[dict] = []
+    for assess in assess_list:
+        try:
+            num = int(assess.get("assessmentNumber") or 0)
+        except (ValueError, TypeError):
+            warnings.append(f"skipping assessment with invalid number: {assess!r}")
+            continue
+
+        title = (assess.get("title") or "").strip() or f"{ctype.module_label} {num}"
+        prefix = f"a{num:02d}"
+        context = f"{ctype.module_label.lower()} {num}"
+        notes: list[str] = []
+
+        # Overview / introduction
+        ov_entry = unit_content.get(f"{prefix}Overview") or {}
+        ov_html = ov_entry.get("text") or ""
+        intro_text = html_to_text(ov_html) or None
+        intro_links = extract_links(ov_html)
+        if not intro_text:
+            notes.append("no overview text")
+
+        # Scoring guide criteria
+        sg = scoring_content.get(f"{prefix}ScoringGuide") or {}
+        sg_table = sg.get("table") or {}
+        criteria = [
+            {
+                "criterion": c.get("criterion"),
+                "weight": c.get("weight"),
+                "non_performance": c.get("nonPerformance"),
+                "basic": c.get("basic"),
+                "proficient": c.get("proficient"),
+                "distinguished": c.get("distinguished"),
+            }
+            for c in (sg_table.get("criteria") or [])
+        ]
+
+        # Primary graded activity (assessment instructions)
+        acts: list[dict] = []
+        instr_entry = unit_content.get(f"{prefix}Instructions") or {}
+        instr_html = instr_entry.get("text") or ""
+        instr_text = html_to_text(instr_html) or None
+        if instr_text or criteria:
+            acts.append({
+                "code": prefix,
+                "title": (instr_entry.get("title") or title).strip(),
+                "activity_type": "assignment",
+                "type_code": instr_entry.get("type"),
+                "grade_type": instr_entry.get("grading"),
+                "grade_weight": None,
+                "goal": None,
+                "text": instr_text,
+                "links": extract_links(instr_html),
+                "resources": [],
+                "scoring_criteria": criteria,
+            })
+        else:
+            notes.append("no instruction text found")
+
+        # Ungraded summary / study entry
+        sum_entry = unit_content.get(f"{prefix}Summary") or {}
+        sum_html = sum_entry.get("text") or ""
+        sum_text = html_to_text(sum_html) or None
+        if sum_text:
+            acts.append({
+                "code": f"{prefix}_summary",
+                "title": (sum_entry.get("title") or "Summary").strip(),
+                "activity_type": "study",
+                "type_code": sum_entry.get("type"),
+                "grade_type": sum_entry.get("grading"),
+                "grade_weight": None,
+                "goal": None,
+                "text": sum_text,
+                "links": extract_links(sum_html),
+                "resources": [],
+            })
+
+        # Resource entries: a01resource1, a01resource2, …
+        resources: list[dict] = []
+        i = 1
+        while True:
+            res_entry = unit_content.get(f"{prefix}resource{i}")
+            if res_entry is None:
+                break
+            res_html = res_entry.get("text") or ""
+            resources.append({
+                "name": (res_entry.get("title") or "").strip() or None,
+                "url": None,
+                "type": "resource",
+                "chapter": None,
+                "annotation": html_to_text(res_html) or None,
+                "citation": None,
+                "links": extract_links(res_html),
+            })
+            i += 1
+
+        modules.append({
+            "number": num,
+            "title": title,
+            "duration": None,
+            "introduction": {"text": intro_text, "links": intro_links},
+            "activities": acts,
+            "resources": resources,
+            "notes": notes,
+        })
+        warnings.extend(f"{context}: {n}" for n in notes)
+
+    course_meta = {
+        "name": name,
+        "number": number,
+        "credits": None,
+        "design_model": "FLEX_PATH2" if ctype == FPX else "GUIDED_PATH2",
+        "type": ctype.key,
+        "module_label": ctype.module_label,
+        "module_dir_prefix": ctype.dir_prefix,
+        "competencies": competencies,
+    }
+    return ctype, course_meta, modules
+
+
+def ingest(
+    course_json_path: Path | str,
+    force_course_type: str | None = None,
+) -> Ingested:
+    """Parse the Capella export into the intermediate structure (in memory).
+
+    force_course_type: "GP" or "FPX" to override auto-detection when the
+    source file lacks or has inconsistent courseDesignModelType/flexPathAny.
     """
     course_json_path = Path(course_json_path)
     data = json.loads(course_json_path.read_text(encoding="utf-8"))
 
-    if not isinstance(data, dict):
-        raise CourseTypeError(
-            f"{course_json_path.name} is not a course content export: expected "
-            f"a JSON object at the top level, got {type(data).__name__}."
-        )
-    course = data.get("course")
-    if isinstance(course, dict) and course:
-        return _ingest_curriculum(data, course_json_path)
-    if isinstance(data.get("unitContent"), dict) and data["unitContent"]:
-        return _ingest_flat(data, course_json_path)
-    keys = ", ".join(list(data)[:12]) or "(none)"
-    raise CourseTypeError(
-        f"{course_json_path.name} does not look like a Capella course export. "
-        f"Top-level keys found: {keys}. Expected either the curriculum export "
-        f"(top-level 'course', 'units', 'activities') or the course content "
-        f"export (top-level 'syllabusContent', 'unitContent', "
-        f"'courseResources')."
-    )
+    # Course Compass export has a completely different schema — dispatch early.
+    if _detect_format(data) == "compass":
+        warnings: list[str] = []
+        _ctype, course_meta, modules = _ingest_compass_format(data, force_course_type, warnings)
+        if not modules:
+            warnings.append("course has no units")
+        structure = {
+            "schema_version": SCHEMA_VERSION,
+            "source_file": str(course_json_path.resolve()),
+            "course": course_meta,
+            "modules": modules,
+            "warnings": warnings,
+        }
+        return Ingested(structure=structure, warnings=warnings)
 
+    # Standard Capella export format.
+    course = data.get("course") or {}
+    if force_course_type == "GP":
+        ctype = GP
+    elif force_course_type == "FPX":
+        ctype = FPX
+    else:
+        ctype = detect_course_type(course)
 
-def _ingest_curriculum(data: dict, course_json_path: Path) -> Ingested:
-    """The curriculum export: course/units/activities with id cross-references."""
-    course = data["course"]
-    ctype = detect_course_type(course)
-
-    warnings: list[str] = []
+    warnings = []
     introductions = _index_by(data.get("introductions"))
     activity_text = _index_by(data.get("activityText"))
     activities_by_id = {}
@@ -292,260 +464,6 @@ def _ingest_curriculum(data: dict, course_json_path: Path) -> Ingested:
             "number": (course.get("number") or "").strip() or None,
             "credits": course.get("credits"),
             "design_model": course.get("courseDesignModelType"),
-            "type": ctype.key,
-            "module_label": ctype.module_label,
-            "module_dir_prefix": ctype.dir_prefix,
-        },
-        "modules": modules,
-        "warnings": warnings,
-    }
-    return Ingested(structure=structure, warnings=warnings)
-
-
-# -- Flat course content export -------------------------------------------
-#
-# A second real-world export layout (seen 2026-06): top-level
-# syllabusContent / scoringGuideContent / unitContent / courseResources.
-# unitContent keys are "a<NN><Role>" (a01Overview, a01Instructions,
-# a01resource2, a01Vendor1, a01ScoringGuideLink, ...) so modules are
-# assessments -> FlexPath. courseResources[*].activity codes reference those
-# entries as u<N>r<M> / u<N>v<M> / a<N>.
-
-_FLAT_KEY = re.compile(r"^a(\d+)[A-Za-z]")
-_FLAT_RES_CODE = re.compile(r"^(?:u(\d+)r(\d+)|u(\d+)v(\d+)|a(\d+))$")
-_COURSE_CODE = re.compile(r"\b([A-Z]{2,5}-FPX\d{3,5}|[A-Z]{2,5}\d{3,5})\b")
-_FLAT_GRADE_TYPES = {
-    "graded": "GRADED",
-    "ungradedRequired": "UNGRADED_REQUIRED",
-    "ungradedOptional": "UNGRADED_OPTIONAL",
-}
-_MOJIBAKE_HINTS = ("â", "Ã", "Â", "ï»")
-
-
-def _fix_mojibake(s: str | None) -> str | None:
-    """Repair UTF-8 text that was decoded as cp1252/latin-1 at export time.
-
-    The flat export arrives double-encoded ("youâ\x80\x99re" for "you're").
-    Only applied when telltale lead bytes are present and the full string
-    round-trips strictly, so clean text passes through untouched.
-    """
-    if not s or not any(h in s for h in _MOJIBAKE_HINTS):
-        return s
-    for _ in range(3):
-        repaired = None
-        for enc in ("cp1252", "latin-1"):
-            try:
-                repaired = s.encode(enc).decode("utf-8")
-                break
-            except (UnicodeEncodeError, UnicodeDecodeError):
-                continue
-        if repaired is None or repaired == s:
-            break
-        s = repaired
-        if not any(h in s for h in _MOJIBAKE_HINTS):
-            break
-    return s.replace("\ufeff", "")
-
-
-def _flat_course_meta(data: dict, warnings: list[str]) -> tuple[str | None, str | None]:
-    """Pull "BHA-FPX3001 - Essentials of ..." out of the course overview."""
-    overview = (data.get("syllabusContent") or {}).get("courseOverview") or {}
-    for raw in (overview.get("openingLanguage"), html_to_text(overview.get("text") or "")):
-        src = _fix_mojibake(raw)
-        if not src:
-            continue
-        m = _COURSE_CODE.search(src)
-        if not m:
-            continue
-        number = m.group(1)
-        name = None
-        tail = re.search(re.escape(number) + r"\s*[-–—:]\s*([^\n.]+)", src)
-        if tail:
-            name = tail.group(1).strip().rstrip(".").strip() or None
-        return number, name
-    warnings.append(
-        "could not find the course number in syllabusContent.courseOverview; "
-        "output will land under 'unknown-course'"
-    )
-    return None, None
-
-
-def _flat_resource_key(code: str) -> str | None:
-    """courseResources activity code -> lowercase unitContent key."""
-    m = _FLAT_RES_CODE.match(code or "")
-    if not m:
-        return None
-    ur_n, ur_m, uv_n, uv_m, a_n = m.groups()
-    if ur_n is not None:
-        return f"a{int(ur_n):02d}resource{int(ur_m)}"
-    if uv_n is not None:
-        return f"a{int(uv_n):02d}vendor{int(uv_m)}"
-    return f"a{int(a_n):02d}instructions"
-
-
-def _flat_resolve_resource(rid: str, res: dict | None) -> dict | None:
-    if not isinstance(res, dict):
-        return None
-    name = _fix_mojibake(html_to_text(res.get("name") or res.get("title") or "")) or None
-    url = res.get("link") or res.get("mediaLink") or res.get("downloadLink")
-    # Links arrive HTML-escaped (&amp; in query strings), like persistentLinks.
-    url = html.unescape(url) if url else None
-    if not name and not url:
-        return None
-    return {
-        "name": name,
-        "url": url,
-        "type": res.get("type") or res.get("category"),
-        "chapter": None,
-        "annotation": None,
-        "citation": None,
-    }
-
-
-def _ingest_flat(data: dict, course_json_path: Path) -> Ingested:
-    """The flat course content export. Assessment-structured, so FlexPath."""
-    warnings: list[str] = []
-    unit_content = data["unitContent"]
-
-    parsed: dict[str, tuple[int, dict]] = {}
-    bad_keys: list[str] = []
-    for key, entry in unit_content.items():
-        m = _FLAT_KEY.match(key)
-        if m and isinstance(entry, dict):
-            parsed[key] = (int(m.group(1)), entry)
-        else:
-            bad_keys.append(key)
-    if not parsed:
-        keys = ", ".join(list(unit_content)[:12]) or "(none)"
-        raise CourseTypeError(
-            f"{course_json_path.name}: unitContent has no a<NN>... assessment "
-            f"entries (found: {keys}). Only assessment-based (FlexPath) files "
-            f"of this layout have been seen; cannot determine the course model."
-        )
-    if bad_keys:
-        warnings.append(
-            "unitContent entries not understood and skipped: " + ", ".join(bad_keys)
-        )
-
-    ctype = FPX
-    number, name = _flat_course_meta(data, warnings)
-
-    # Attach courseResources to unitContent entries via their activity codes.
-    course_resources = data.get("courseResources") or {}
-    key_by_lc = {k.lower(): k for k in parsed}
-    entry_rids = {
-        next(iter(d))
-        for _, entry in parsed.values()
-        for d in entry.get("resources") or []
-        if isinstance(d, dict) and d
-    }
-    rids_by_key: dict[str, list[str]] = {}
-    unattached: list[str] = []
-    for rid, res in course_resources.items():
-        attached = rid in entry_rids
-        for code in (res or {}).get("activity") or []:
-            target = _flat_resource_key(code)
-            actual = key_by_lc.get(target) if target else None
-            if actual:
-                rids_by_key.setdefault(actual, []).append(rid)
-                attached = True
-        if not attached and isinstance(res, dict):
-            nm = _fix_mojibake(html_to_text(res.get("name") or res.get("title") or ""))
-            unattached.append(nm or rid)
-    if unattached:
-        warnings.append(
-            "course-level resources not tied to an assessment were skipped: "
-            + ", ".join(unattached)
-        )
-
-    # Assessment titles from the syllabus grading block.
-    titles: dict[int, str] = {}
-    grading = (data.get("syllabusContent") or {}).get("courseGrading") or {}
-    for a in grading.get("assessments") or []:
-        try:
-            n = int((a or {}).get("assessmentNumber"))
-        except (TypeError, ValueError):
-            continue
-        title = _fix_mojibake((a.get("title") or "").strip())
-        if title:
-            titles.setdefault(n, title)
-
-    modules: list[dict] = []
-    for n in sorted({num for num, _ in parsed.values()}):
-        context = f"{ctype.module_label.lower()} {n}"
-        notes: list[str] = []
-        intro_text, intro_links, overview_title = None, [], None
-        acts: list[dict] = []
-
-        for key, (num, entry) in parsed.items():
-            if num != n:
-                continue
-            text_html = _fix_mojibake(entry.get("text"))
-            title = _fix_mojibake((entry.get("title") or "").strip()) or None
-            etype = entry.get("type")
-            if etype == "introduction" and intro_text is None:
-                overview_title = title
-                intro_text = html_to_text(text_html) or None
-                intro_links = extract_links(text_html)
-                if not intro_text:
-                    notes.append("introduction is empty")
-                continue
-            if etype is None and not (text_html or "").strip():
-                continue  # aNNScoringGuideLink stubs carry no content
-
-            res_list: list[dict] = []
-            rids = [next(iter(d)) for d in entry.get("resources") or []
-                    if isinstance(d, dict) and d]
-            rids += rids_by_key.get(key, [])
-            for rid in dict.fromkeys(rids):
-                resolved = _flat_resolve_resource(rid, course_resources.get(rid))
-                if resolved is None:
-                    notes.append(f"resource {rid} not found or empty; skipped")
-                else:
-                    res_list.append(resolved)
-            # Relative ./Course_Files/... hrefs are meaningless outside the
-            # courseroom; the same files arrive via courseResources with real
-            # download URLs.
-            links = [l for l in extract_links(text_html)
-                     if l["url"].startswith(("http://", "https://"))]
-            acts.append({
-                "code": key,
-                "title": title,
-                "activity_type": etype,
-                "type_code": None,
-                "grade_type": _FLAT_GRADE_TYPES.get(
-                    entry.get("grading"), entry.get("grading")
-                ),
-                "grade_weight": None,
-                "goal": None,
-                "text": html_to_text(text_html) or None,
-                "links": links,
-                "resources": res_list,
-            })
-
-        if intro_text is None and not intro_links:
-            notes.append("unit has no introduction")
-        if not acts:
-            notes.append("unit has no activities")
-        modules.append({
-            "number": n,
-            "title": titles.get(n) or overview_title or f"{ctype.module_label} {n}",
-            "duration": None,
-            "introduction": {"text": intro_text, "links": intro_links},
-            "activities": acts,
-            "resources": [],
-            "notes": notes,
-        })
-        warnings.extend(f"{context}: {x}" for x in notes)
-
-    structure = {
-        "schema_version": SCHEMA_VERSION,
-        "source_file": str(course_json_path.resolve()),
-        "course": {
-            "name": name,
-            "number": number,
-            "credits": None,
-            "design_model": None,
             "type": ctype.key,
             "module_label": ctype.module_label,
             "module_dir_prefix": ctype.dir_prefix,

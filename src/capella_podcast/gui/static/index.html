@@ -20,7 +20,7 @@
 
   <button id="btn-ingest" class="btn btn-light btn-block">
     <svg viewBox="0 0 16 16"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    Ingest course JSON
+    Ingest course file
   </button>
 
   <div class="side-label">Courses</div>
@@ -45,9 +45,9 @@
       <div class="empty-card">
         <svg viewBox="0 0 48 48" class="empty-icon"><rect x="6" y="4" width="28" height="36" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 13h16M12 19h16M12 25h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="36" cy="34" r="9" fill="currentColor"/><path d="m33.5 30.5 7 3.5-7 3.5z" fill="#fff"/></svg>
         <h2>No courses yet</h2>
-        <p>Ingest a Capella course content JSON export to get started.<br>
+        <p>Ingest a Capella course content export (.json or .txt) to get started.<br>
            Each module then gets a summary report, a two-host script, and a podcast — all generated locally.</p>
-        <button class="btn btn-primary" id="btn-ingest-empty">Ingest course JSON</button>
+        <button class="btn btn-primary" id="btn-ingest-empty">Ingest course file</button>
       </div>
     </section>
 
@@ -84,10 +84,18 @@
 <dialog id="ingest-modal">
   <form method="dialog" id="ingest-form">
     <h3>Ingest a course</h3>
-    <p class="muted">Pick the Capella course content JSON export. The file is only read — it stays where it is.</p>
+    <p class="muted">Pick the Capella course content export (.json or .txt). The file is only read — it stays where it is.</p>
     <div class="row">
       <input type="text" id="ingest-path" placeholder="C:\path\to\course-export.json" spellcheck="false">
       <button type="button" class="btn" id="btn-browse">Browse…</button>
+    </div>
+    <div class="field-row">
+      <label for="ingest-course-type">Course model</label>
+      <select id="ingest-course-type">
+        <option value="">Auto-detect from file</option>
+        <option value="GP">Guided Path</option>
+        <option value="FPX">FlexPath</option>
+      </select>
     </div>
     <p class="error-text" id="ingest-error" hidden></p>
     <div class="dialog-actions">

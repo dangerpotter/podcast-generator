@@ -563,6 +563,7 @@ async function saveSettings() {
 
 function openIngestModal(prefill = "") {
   $("ingest-path").value = prefill;
+  $("ingest-course-type").value = "";
   $("ingest-error").hidden = true;
   $("ingest-modal").showModal();
   if (!prefill) $("ingest-path").focus();
@@ -580,13 +581,14 @@ async function doBrowse() {
 
 async function doIngest() {
   const path = $("ingest-path").value.trim();
+  const course_type = $("ingest-course-type").value;
   const errEl = $("ingest-error");
-  if (!path) { errEl.textContent = "Enter or browse to the course JSON file."; errEl.hidden = false; return; }
+  if (!path) { errEl.textContent = "Enter or browse to the course export file (.json or .txt)."; errEl.hidden = false; return; }
   const goBtn = $("ingest-go");
   goBtn.disabled = true;
   goBtn.textContent = "Ingesting…";
   try {
-    const res = await api("/api/ingest", { body: { path } });
+    const res = await api("/api/ingest", { body: { path, course_type } });
     $("ingest-modal").close();
     const wn = res.warnings.length ? ` (${res.warnings.length} warning${res.warnings.length > 1 ? "s" : ""} — see course page)` : "";
     toast(`Ingested ${res.course.number}: ${res.modules} ${res.course.module_label.toLowerCase()}s${wn}`, res.warnings.length ? "warn" : "ok");

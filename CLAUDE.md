@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project memory for the Capella Course Podcast Generator. This file is the durable, always-loaded spec summary and the authoritative reference for project decisions.
+Project memory for the Capella Course Podcast Generator. Read `docs/GOAL.md` for the full spec; this file is the durable, always-loaded summary. If anything here conflicts with `docs/GOAL.md`, `docs/GOAL.md` wins and this file should be updated.
 
 ## What this is
 
@@ -17,7 +17,7 @@ A fully local, offline app. It ingests a Capella course content JSON export and,
 - Language: Python.
 - LLM: Gemma 4 12B Unified, instruction-tuned, run through embedded llama.cpp via `llama-cpp-python` (in-process, no daemon). Default weights: `unsloth/gemma-4-12B-it-qat-GGUF`. NOTE (verified 2026-06): that repo's only main weights file is `gemma-4-12B-it-qat-UD-Q4_K_XL.gguf` (~6.3 GB) — there is no Q4_0 there; the repo also carries auxiliary GGUFs (`MTP/*`, `mmproj-*`) that must never be selected as the model. Alternates configurable: `unsloth/gemma-4-12b-it-GGUF` at Q4_K_M / Q5_K_M. Lighter fallback for weak hardware: Gemma 4 E4B (`unsloth/gemma-4-E4B-it-GGUF`, UD-Q4_K_XL, ~4.8 GB). Both are first-class presets: `llm.model: 12b|e4b` in config.yaml or `capella-podcast --model e4b <cmd>`; cached GGUFs are matched by model-name prefix AND quant so the two presets never collide in models/.
 - LLM settings: thinking mode OFF by default (throughput). Sampling temperature 1.0, top_p 0.95, top_k 64. 256K context available.
-- TTS: Kokoro-82M v1.0 via the `kokoro` package (`KPipeline`). Requires system `espeak-ng`; on Windows without admin rights, `msiexec /a espeak-ng.msi /qn TARGETDIR="<repo>\.tools\espeak-ng"` unpacks it locally and the app finds it there. First Kokoro use also fetches spacy `en_core_web_sm` (cached afterwards). MP3 encoding via the bundled libsndfile (soundfile package), no ffmpeg. Two distinct voices for the two-host podcast.
+- TTS: Kokoro-82M v1.0 via the `kokoro` package (`KPipeline`). Requires system `espeak-ng`; on Windows without admin rights, `msiexec /a espeak-ng.msi /qn TARGETDIR="<repo>\.tools\espeak-ng"` unpacks it locally and the app finds it there. MP3 encoding via the bundled libsndfile (soundfile package), no ffmpeg. Two distinct voices for the two-host podcast.
 - DOCX: `python-docx`. Validate every generated file before moving on.
 - Model provisioning: on first run, download the configured GGUF from Hugging Face into a configurable local cache, then load in-process. Gemma weights may be license-gated on HF (Unsloth mirror is often ungated); on a gated/missing download, print exact setup steps, do not fail obscurely.
 
@@ -26,6 +26,18 @@ A fully local, offline app. It ingests a Capella course content JSON export and,
 - `course.courseDesignModelType`: `GUIDED_PATH2` = Guided Path, `FLEX_PATH2` = FlexPath.
 - Cross-check `course.flexPathAny` (false = GP, true = FPX). If the two disagree or the value is unknown, stop and report.
 - Guided Path: modules are WEEKS (usually 10). FlexPath: modules are ASSESSMENTS (up to 10, often fewer).
+
+## Course Compass export format
+
+A second ingest format is auto-detected by `ingest._detect_format()`: if the root of the JSON has both `syllabusContent` and `unitContent` keys, it is a Course Compass export and is handled by `_ingest_compass_format()`. Both formats produce the same intermediate `course-structure.json` schema.
+
+Key parsing differences from the standard export:
+- Course number/name extracted by regex from `syllabusContent.courseOverview.openingLanguage`.
+- Course type inferred from the course number ("FPX" in the number → FlexPath); use `force_course_type="GP"|"FPX"` to override.
+- Modules built from `syllabusContent.courseGrading.assessments[]` in order.
+- Per-module content keyed under `unitContent` as `a{NN}Overview`, `a{NN}Instructions`, `a{NN}Summary`, `a{NN}resource1`…
+- Scoring criteria from `scoringGuideContent.a{NN}ScoringGuide.table.criteria[]`.
+- `gradeWeight` and `goal` are always `null` in Compass exports.
 
 ## JSON parsing gotchas
 
@@ -37,7 +49,6 @@ A fully local, offline app. It ingests a Capella course content JSON export and,
 - Resources: spread across `resources[]`, `resourcesReferences[]`, `resourceFormats[]`. Pull readable titles and URLs (`resourceName`, `persistentLinks`, format `author`/`title`/`publisher`). Verified linkage: unit/activity `courseResourceReferenceIds` -> `resourcesReferences[].courseResourceReference.id`; each wrapper's `courseResourceIds`/`courseResourceFormatIds` -> `resources[].resource.id` / `resourceFormats[].id`. `resources[]` entries WRAP an inner `resource` object (wrapper key `courseMaterialsForamtIds` is misspelled in the real export). `persistentLinks` URLs arrive HTML-escaped (`&amp;`) — unescape them. Format `title`/`APACitation` contain HTML (`<em>`) — strip. FPX exports omit `gradeWeight`/`goal` keys on activities entirely.
 - Every `.text` field is HTML: strip to plain text for LLM input, but preserve link URLs where they feed Recommended Resources.
 - Be defensive: nulls, empty arrays, activities with no text, units with no introduction. Skip gracefully and note it in the manifest.
-- SECOND INPUT FORMAT (flat course content export, first seen 2026-06, may arrive as `.txt`): top-level `syllabusContent`/`scoringGuideContent`/`unitContent`/`courseResources`, NO `course` object. `ingest()` sniffs the shape and dispatches (`_ingest_flat`). `unitContent` keys are `a<NN><Role>`: Overview = module intro; Summary/Instructions/resourceN/VendorN = activities; ScoringGuideLink = empty stub, skip. Assessment-structured, so always FPX. Course number/title regex-parsed from `syllabusContent.courseOverview` ("..., BHA-FPX3001 - Title"); module titles from `courseGrading.assessments`. `courseResources[*].activity` codes map to entries: `u<N>r<M>` -> `a<NN>resource<M>`, `u<N>v<M>` -> `a<NN>Vendor<M>`, `a<N>` -> `a<NN>Instructions`; entries also carry `resources: [{"resource_id_NNN": type}]`. Quirks: text is mojibake double-encoded ("youâ€™re") — repaired conservatively by `_fix_mojibake`; URLs are HTML-escaped (`&amp;`); relative `./Course_Files/...` hrefs are dropped (real download URLs come via `courseResources`); no per-activity grade weights.
 
 ## DOCX styling constants (match the example reports exactly)
 
@@ -86,7 +97,7 @@ output/{course.number}/
 
 ## Repo conventions
 
-- `CLAUDE.md` stays at repo root and is the spec of record.
+- `CLAUDE.md` stays at repo root. Full spec lives in `docs/GOAL.md`.
 - App code under `src/`. Config via a `config` file (model repo/quant/size, cache path, thinking toggle, sampling, host count, Kokoro voices/speed, output paths, brand color, logo override).
 - Keep LLM prompts as code-managed templates, one per section type, easy to tune.
 - Gitignore `models/` (GGUF cache) and `output/` (generated artifacts).

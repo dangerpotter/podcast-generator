@@ -34,17 +34,96 @@ echo.
 echo  Creating .venv using "%BOOTPY%" ...
 %BOOTPY% -m venv .venv
 if errorlevel 1 goto setupfail
-echo  Installing the app and its dependencies - this is the slow part...
-"%PY%" -m pip install --upgrade pip
+
+echo  Upgrading pip...
+"%PY%" -m pip install --upgrade pip --quiet
 if errorlevel 1 goto setupfail
-"%PY%" -m pip install -e .
+
+rem llama-cpp-python must be pre-installed with a prebuilt binary wheel before
+rem the main package install.  Without this step pip may try to compile it from
+rem C++ source code, which requires Visual Studio Build Tools and CMake.
+rem We try two routes: (1) the prebuilt-wheel index maintained by the library
+rem author, (2) standard PyPI (covers platforms where a wheel is published there).
+echo  Installing llama-cpp-python ^(prebuilt CPU wheel - avoids compiler requirement^)...
+"%PY%" -m pip install "llama-cpp-python>=0.3.0" --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --quiet
+if not errorlevel 1 goto llama_ok
+
+echo  Prebuilt CPU wheel not available for this Python version.
+echo  Trying standard PyPI ^(works if a binary wheel is published there^)...
+"%PY%" -m pip install "llama-cpp-python>=0.3.0" --quiet
+if not errorlevel 1 goto llama_ok
+
+echo.
+echo  llama-cpp-python could not be installed automatically.
+echo.
+echo  Common solutions:
+echo    A^) Install Visual Studio Build Tools ^(free, ~3-4 GB^):
+echo        https://aka.ms/vs/17/release/vs_BuildTools.exe
+echo        Select the "Desktop development with C++" workload, then
+echo        re-run this launcher.
+echo.
+echo    B^) NVIDIA GPU users: download a CUDA-enabled wheel from
+echo        https://github.com/abetlen/llama-cpp-python/releases
+echo        then install it manually:
+echo          .venv\Scripts\pip install ^<downloaded-wheel^>.whl
+echo        then re-run this launcher ^(setup will skip this step^).
+echo.
+echo    C^) For more detail run:  .venv\Scripts\capella-podcast doctor
+echo.
+goto setupfail
+
+:llama_ok
+echo  Installing remaining packages...
+"%PY%" -m pip install -e . --quiet
 if errorlevel 1 goto setupfail
 echo.
 echo  Setup complete.
+
+rem ---- Check espeak-ng (needed only for podcast/MP3 generation) -----------
+set "ESPEAK_FOUND=0"
+where espeak-ng >nul 2>&1
+if not errorlevel 1 set "ESPEAK_FOUND=1"
+if "%ESPEAK_FOUND%"=="0" if exist "C:\Program Files\eSpeak NG\libespeak-ng.dll" set "ESPEAK_FOUND=1"
+if "%ESPEAK_FOUND%"=="0" if exist "%~dp0.tools\espeak-ng\eSpeak NG\libespeak-ng.dll" set "ESPEAK_FOUND=1"
+
+if "%ESPEAK_FOUND%"=="1" (
+    echo  espeak-ng is installed - podcast ^(MP3^) generation is ready.
+    echo.
+    pause
+    goto run
+)
+
 echo.
-echo  NOTE: podcast audio needs espeak-ng. If you don't have it yet, run:
-echo      winget install --id eSpeak-NG.eSpeak-NG
-echo  Summaries and scripts work fine without it.
+echo  espeak-ng is NOT installed. Summaries and scripts will work fine,
+echo  but podcast ^(MP3^) generation needs it.
+echo.
+
+where winget >nul 2>&1
+if errorlevel 1 goto espeak_manual
+
+choice /C YN /M "  Install espeak-ng now via winget"
+if errorlevel 2 goto espeak_skip
+
+winget install --id eSpeak-NG.eSpeak-NG
+if errorlevel 1 (
+    echo  Auto-install failed. See manual instructions below.
+    goto espeak_manual
+)
+echo  espeak-ng installed successfully.
+echo.
+pause
+goto run
+
+:espeak_skip
+echo  Skipped. To install later:  winget install --id eSpeak-NG.eSpeak-NG
+echo.
+pause
+goto run
+
+:espeak_manual
+echo  Install manually from https://github.com/espeak-ng/espeak-ng/releases
+echo  No admin rights? Extract it locally instead:
+echo    msiexec /a espeak-ng.msi /qn TARGETDIR="%~dp0.tools\espeak-ng"
 echo.
 pause
 

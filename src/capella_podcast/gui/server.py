@@ -343,8 +343,13 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     path = filedialog.askopenfilename(
                         parent=root,
-                        title="Select Capella course JSON export",
-                        filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                        title="Select Capella course export file",
+                        filetypes=[
+                            ("Course export files", "*.json *.txt"),
+                            ("JSON files", "*.json"),
+                            ("Text files", "*.txt"),
+                            ("All files", "*.*"),
+                        ],
                     )
                 finally:
                     root.destroy()
@@ -359,13 +364,16 @@ class Handler(BaseHTTPRequestHandler):
         src = Path(raw)
         if not src.is_file():
             return self._error(f"file not found: {src}")
+        course_type = (body.get("course_type") or "").strip() or None
+        if course_type not in (None, "GP", "FPX"):
+            return self._error(f"invalid course_type: {course_type!r}")
         cfg = self.state.cfg()
         try:
-            result = actions.do_ingest(cfg, src)
+            result = actions.do_ingest(cfg, src, force_course_type=course_type)
         except ingest_mod.CourseTypeError as e:
             return self._error(str(e))
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            return self._error(f"not a valid course JSON file: {e}")
+            return self._error(f"not a valid course export file: {e}")
         self._json(result)
 
     def _post_run(self, body: dict) -> None:

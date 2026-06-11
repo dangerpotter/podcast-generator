@@ -303,6 +303,9 @@ dialog h3 { margin: 0 0 6px; color: var(--teal); }
 dialog .muted { color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
 dialog .row { display: flex; gap: 8px; }
 #ingest-path { flex: 1; padding: 8px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: var(--mono); }
+dialog .field-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+dialog .field-row label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+dialog .field-row select { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: var(--bg); color: var(--text); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .error-text { color: var(--err); font-size: 12.5px; margin: 10px 0 0; }
 

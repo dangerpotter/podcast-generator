@@ -189,13 +189,15 @@ class LlamaRunner:
         try:
             from llama_cpp import Llama
         except ImportError as e:
-            raise ModelProvisioningError(
-                "llama-cpp-python is not installed or its native wheel failed to "
-                "load. Reinstall with:\n"
-                "  pip install --upgrade llama-cpp-python\n"
-                "(prebuilt CPU wheels exist for most platforms; on GPU machines "
-                "see the llama-cpp-python docs for CUDA/Metal wheels)."
-            ) from e
+            msg = (
+                "llama-cpp-python is not installed or its native extension failed to load.\n"
+                "Prebuilt CPU wheel (no compiler needed):\n"
+                "  pip install llama-cpp-python "
+                "--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu\n"
+                "CUDA/Metal wheel: https://github.com/abetlen/llama-cpp-python/releases\n"
+                "Run `capella-podcast doctor` to check all dependencies at once."
+            )
+            raise ModelProvisioningError(msg) from e
 
         check_ram(self.cfg)
         model_path = ensure_model(self.cfg)
