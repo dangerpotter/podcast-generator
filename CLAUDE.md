@@ -37,6 +37,7 @@ A fully local, offline app. It ingests a Capella course content JSON export and,
 - Resources: spread across `resources[]`, `resourcesReferences[]`, `resourceFormats[]`. Pull readable titles and URLs (`resourceName`, `persistentLinks`, format `author`/`title`/`publisher`). Verified linkage: unit/activity `courseResourceReferenceIds` -> `resourcesReferences[].courseResourceReference.id`; each wrapper's `courseResourceIds`/`courseResourceFormatIds` -> `resources[].resource.id` / `resourceFormats[].id`. `resources[]` entries WRAP an inner `resource` object (wrapper key `courseMaterialsForamtIds` is misspelled in the real export). `persistentLinks` URLs arrive HTML-escaped (`&amp;`) — unescape them. Format `title`/`APACitation` contain HTML (`<em>`) — strip. FPX exports omit `gradeWeight`/`goal` keys on activities entirely.
 - Every `.text` field is HTML: strip to plain text for LLM input, but preserve link URLs where they feed Recommended Resources.
 - Be defensive: nulls, empty arrays, activities with no text, units with no introduction. Skip gracefully and note it in the manifest.
+- SECOND INPUT FORMAT (flat course content export, first seen 2026-06, may arrive as `.txt`): top-level `syllabusContent`/`scoringGuideContent`/`unitContent`/`courseResources`, NO `course` object. `ingest()` sniffs the shape and dispatches (`_ingest_flat`). `unitContent` keys are `a<NN><Role>`: Overview = module intro; Summary/Instructions/resourceN/VendorN = activities; ScoringGuideLink = empty stub, skip. Assessment-structured, so always FPX. Course number/title regex-parsed from `syllabusContent.courseOverview` ("..., BHA-FPX3001 - Title"); module titles from `courseGrading.assessments`. `courseResources[*].activity` codes map to entries: `u<N>r<M>` -> `a<NN>resource<M>`, `u<N>v<M>` -> `a<NN>Vendor<M>`, `a<N>` -> `a<NN>Instructions`; entries also carry `resources: [{"resource_id_NNN": type}]`. Quirks: text is mojibake double-encoded ("youâ€™re") — repaired conservatively by `_fix_mojibake`; URLs are HTML-escaped (`&amp;`); relative `./Course_Files/...` hrefs are dropped (real download URLs come via `courseResources`); no per-activity grade weights.
 
 ## DOCX styling constants (match the example reports exactly)
 
@@ -75,6 +76,13 @@ output/{course.number}/
     script.docx
     podcast.mp3
 ```
+
+## GUI
+
+- Local web GUI at `src/capella_podcast/gui/`: stdlib-only `http.server` bound to 127.0.0.1 (no new dependencies), launched via `capella-podcast gui` / `python -m capella_podcast.gui` / `Start Podcast Generator.bat` at repo root. Serves a static single-page app (`gui/static/`) plus a JSON API.
+- One background worker thread runs generation jobs sequentially (`gui/jobs.py`); stdout/stderr are teed into a log the page polls; cancellation is cooperative between modules. Pipeline calls mirror the cli.py loops (`gui/actions.py`) and never bypass manifest recording.
+- Settings page edits config.yaml via targeted line replacement (`gui/config_edit.py`) so file comments are preserved; only whitelisted keys are editable, and the result is re-validated with `load_config` (reverted on failure).
+- Staleness/edited detection compares artifact mtimes against manifest `generated_at` and against upstream files; the GUI surfaces regen actions accordingly.
 
 ## Repo conventions
 
