@@ -13,8 +13,7 @@ edit-and-regenerate loop.
   deterministically from the export data — the LLM only summarizes and organizes,
   and is never allowed to invent dates, weights, or resources.
 
-Spec lives in [CLAUDE.md](CLAUDE.md) (summary) and [docs/GOAL.md](docs/GOAL.md)
-(authoritative).
+Spec lives in [CLAUDE.md](CLAUDE.md).
 
 ## Setup
 
@@ -100,7 +99,6 @@ Edited files are always re-parsed from disk; your wording is never reverted.
 - `src/capella_podcast/` — the package (ingest, LLM, DOCX render/validate, TTS, CLI)
 - `src/capella_podcast/gui/` — local web GUI (stdlib HTTP server + static page,
   no extra dependencies); launched by `capella-podcast gui` or the root `.bat`
-- `docs/GOAL.md` — full specification
 - `tests/` — validation scripts (ingest checks, layout fingerprint vs the
   reference reports, end-to-end tree validation, regen acceptance test)
 - `samples/`, `assets/` — empty in this repo: Capella course exports, example

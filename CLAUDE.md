@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project memory for the Capella Course Podcast Generator. Read `docs/GOAL.md` for the full spec; this file is the durable, always-loaded summary. If anything here conflicts with `docs/GOAL.md`, `docs/GOAL.md` wins and this file should be updated.
+Project memory for the Capella Course Podcast Generator. This file is the durable, always-loaded spec summary and the authoritative reference for project decisions.
 
 ## What this is
 
@@ -86,7 +86,7 @@ output/{course.number}/
 
 ## Repo conventions
 
-- `CLAUDE.md` stays at repo root. Full spec lives in `docs/GOAL.md`.
+- `CLAUDE.md` stays at repo root and is the spec of record.
 - App code under `src/`. Config via a `config` file (model repo/quant/size, cache path, thinking toggle, sampling, host count, Kokoro voices/speed, output paths, brand color, logo override).
 - Keep LLM prompts as code-managed templates, one per section type, easy to tune.
 - Gitignore `models/` (GGUF cache) and `output/` (generated artifacts).
