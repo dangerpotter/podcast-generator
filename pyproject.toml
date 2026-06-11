@@ -27,3 +27,6 @@ capella-podcast = "capella_podcast.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"capella_podcast.gui" = ["static/*"]

@@ -140,6 +140,17 @@ def cmd_regen(cfg, args):
         cmd_podcasts(cfg, args)
 
 
+def cmd_gui(cfg, args):
+    from .gui.server import run
+
+    run(
+        config_path=args.config,
+        port=args.port,
+        open_browser=not args.no_browser,
+        model=args.model,
+    )
+
+
 def cmd_run_all(cfg, args):
     course_dir = cmd_ingest(cfg, args)
     args.course = course_dir.name
@@ -193,6 +204,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("run-all", help="full pipeline: ingest -> summaries -> scripts -> podcasts")
     sp.add_argument("course_json")
     sp.set_defaults(func=cmd_run_all)
+
+    sp = sub.add_parser("gui", help="launch the local web GUI (binds 127.0.0.1)")
+    sp.add_argument("--port", type=int, default=8765, help="port to serve on (default: 8765)")
+    sp.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    sp.set_defaults(func=cmd_gui)
     return p
 
 

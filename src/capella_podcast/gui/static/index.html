@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capella Course Podcast Generator</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F4761'/%3E%3Cpath d='M10 8h12v3h-9v10h9v3H10z' fill='white'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="brand">
+    <img id="brand-logo" src="/api/logo" alt="" onerror="this.style.display='none'">
+    <div class="brand-text">
+      <div class="brand-title">Course Podcast<br>Generator</div>
+      <div class="brand-sub">Local &amp; offline</div>
+    </div>
+  </div>
+
+  <button id="btn-ingest" class="btn btn-light btn-block">
+    <svg viewBox="0 0 16 16"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13h10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Ingest course JSON
+  </button>
+
+  <div class="side-label">Courses</div>
+  <nav id="course-list"></nav>
+
+  <div class="side-footer">
+    <button id="nav-settings" class="side-link">
+      <svg viewBox="0 0 16 16"><path d="M8 5.2A2.8 2.8 0 1 0 8 10.8 2.8 2.8 0 0 0 8 5.2zm6-.4-1.5-.4a4.8 4.8 0 0 0-.5-1.1l.8-1.3-1.3-1.3-1.3.8c-.4-.2-.7-.4-1.1-.5L8.7 0H7.3l-.4 1.5c-.4.1-.8.3-1.1.5L4.5 1.2 3.2 2.5l.8 1.3c-.2.3-.4.7-.5 1.1L2 5.2v1.4l1.5.4c.1.4.3.8.5 1.1l-.8 1.3 1.3 1.3 1.3-.8c.3.2.7.4 1.1.5l.4 1.5h1.4l.4-1.5c.4-.1.8-.3 1.1-.5l1.3.8 1.3-1.3-.8-1.3c.2-.3.4-.7.5-1.1l1.5-.4z" transform="translate(0 2)" fill="currentColor"/></svg>
+      Settings
+    </button>
+    <div class="side-status">
+      <span id="model-badge" class="badge badge-model" title="Active LLM preset">—</span>
+      <span id="status-pill" class="status-pill idle"><span class="dot"></span><span id="status-text">Idle</span></span>
+    </div>
+  </div>
+</aside>
+
+<div id="content">
+  <main id="main">
+    <!-- Empty state -->
+    <section id="view-empty" class="view" hidden>
+      <div class="empty-card">
+        <svg viewBox="0 0 48 48" class="empty-icon"><rect x="6" y="4" width="28" height="36" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 13h16M12 19h16M12 25h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="36" cy="34" r="9" fill="currentColor"/><path d="m33.5 30.5 7 3.5-7 3.5z" fill="#fff"/></svg>
+        <h2>No courses yet</h2>
+        <p>Ingest a Capella course content JSON export to get started.<br>
+           Each module then gets a summary report, a two-host script, and a podcast — all generated locally.</p>
+        <button class="btn btn-primary" id="btn-ingest-empty">Ingest course JSON</button>
+      </div>
+    </section>
+
+    <!-- Course view -->
+    <section id="view-course" class="view" hidden></section>
+
+    <!-- Settings view -->
+    <section id="view-settings" class="view" hidden></section>
+  </main>
+
+  <!-- Player bar -->
+  <div id="player" hidden>
+    <svg viewBox="0 0 16 16" class="player-icon"><path d="M2 6v4h3l4 3V3L5 6H2zm10.5 2a3 3 0 0 0-1.7-2.7v5.3A3 3 0 0 0 12.5 8z" fill="currentColor"/></svg>
+    <span id="player-title"></span>
+    <audio id="player-audio" controls preload="none"></audio>
+    <button class="icon-btn" id="player-close" title="Close player">✕</button>
+  </div>
+
+  <!-- Console drawer -->
+  <div id="console" class="collapsed">
+    <div id="console-head">
+      <span id="console-spinner" class="spinner" hidden></span>
+      <span id="console-title">No activity yet</span>
+      <span id="console-progress"></span>
+      <div class="console-bar"><div id="console-bar-fill"></div></div>
+      <button class="btn btn-small btn-danger" id="btn-cancel" hidden>Stop after current item</button>
+      <button class="icon-btn" id="console-toggle" title="Show or hide the log">▴</button>
+    </div>
+    <pre id="console-log"></pre>
+  </div>
+</div>
+
+<!-- Ingest dialog -->
+<dialog id="ingest-modal">
+  <form method="dialog" id="ingest-form">
+    <h3>Ingest a course</h3>
+    <p class="muted">Pick the Capella course content JSON export. The file is only read — it stays where it is.</p>
+    <div class="row">
+      <input type="text" id="ingest-path" placeholder="C:\path\to\course-export.json" spellcheck="false">
+      <button type="button" class="btn" id="btn-browse">Browse…</button>
+    </div>
+    <p class="error-text" id="ingest-error" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="ingest-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="ingest-go">Ingest</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

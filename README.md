@@ -40,6 +40,22 @@ Settings live in [config.yaml](config.yaml).
 
 ## Usage
 
+### GUI
+
+Double-click **`Start Podcast Generator.bat`** (or run `capella-podcast gui`).
+A local web app opens at `http://127.0.0.1:8765/` — local only, nothing is
+served beyond your machine. From there you can ingest a course JSON (native
+file picker), generate or regenerate any stage per module or for the whole
+course, watch live progress logs, play podcasts in the browser, open the DOCX
+files in Word, and edit the common settings (model preset, voices, podcast
+length). Stale artifacts are flagged: if you edit a `summary.docx` in Word,
+the GUI shows an "edited" tag and offers one-click regeneration of the
+downstream script and podcast.
+
+`capella-podcast gui --port N --no-browser` for variations.
+
+### CLI
+
 ```powershell
 capella-podcast ingest <course.json>     # Stage 1: intermediate structure
 capella-podcast summaries [--module N]   # Stage 2: Summary Report DOCX
@@ -82,6 +98,8 @@ Edited files are always re-parsed from disk; your wording is never reverted.
 ## Repo layout
 
 - `src/capella_podcast/` — the package (ingest, LLM, DOCX render/validate, TTS, CLI)
+- `src/capella_podcast/gui/` — local web GUI (stdlib HTTP server + static page,
+  no extra dependencies); launched by `capella-podcast gui` or the root `.bat`
 - `docs/GOAL.md` — full specification
 - `tests/` — validation scripts (ingest checks, layout fingerprint vs the
   reference reports, end-to-end tree validation, regen acceptance test)
