@@ -66,9 +66,16 @@ Key parsing differences from the standard export:
 ## Pipeline contract
 
 1. Ingest -> `output/{course.number}/course-structure.json` (the intermediate; the contract between stages).
-2. Summaries -> `cc_{courseID}_assessment_summary-NN.docx` per module (LLM writes from the intermediate).
-3. Scripts -> `cc_{courseID}_podcast_script-NN.docx` per module (LLM writes from the summary DOCX, NOT raw JSON, so report edits flow through). Two-host conversational, ~3 to 6 min. Mark speaker turns machine-parseably (`HOST A:` / `HOST B:` prefixes).
-4. Podcasts -> `cc_{courseID}_podcast_overview-NN.mp3` per module (Kokoro reads the script, one voice per host, natural pauses).
+2. Summaries -> `cc_{lowercase_course_id}_assessment_summary-{NN}.docx` per module (LLM writes from the intermediate).
+3. Scripts -> `cc_{lowercase_course_id}_podcast_script-{NN}.docx` per module (LLM writes from the summary DOCX, NOT raw JSON, so report edits flow through). Two-host conversational, ~3 to 6 min. Mark speaker turns machine-parseably (`HOST A:` / `HOST B:` prefixes).
+4. Podcasts -> `cc_{lowercase_course_id}_podcast_overview-{NN}.mp3` per module (Kokoro reads the script, one voice per host, natural pauses).
+
+`NN` is the two-digit module/assessment number. Example for Assessment 1 of
+`MBA-FPX5006`: `cc_mba-fpx5006_assessment_summary-01.docx`,
+`cc_mba-fpx5006_podcast_script-01.docx`, and
+`cc_mba-fpx5006_podcast_overview-01.mp3`.
+The `assessment_summary` filename label applies to both Guided Path week
+modules and FlexPath assessments.
 
 ## Regeneration rules
 
@@ -83,9 +90,9 @@ output/{course.number}/
   course-structure.json
   manifest.json
   week-01/ (or assessment-01/)
-    cc_{courseID}_assessment_summary-NN.docx
-    cc_{courseID}_podcast_script-NN.docx
-    cc_{courseID}_podcast_overview-NN.mp3
+    cc_{lowercase_course_id}_assessment_summary-{NN}.docx
+    cc_{lowercase_course_id}_podcast_script-{NN}.docx
+    cc_{lowercase_course_id}_podcast_overview-{NN}.mp3
 ```
 
 ## GUI
