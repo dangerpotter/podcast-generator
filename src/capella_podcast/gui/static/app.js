@@ -293,11 +293,11 @@ function bindCourseActions() {
     } else if (act === "play") {
       el.addEventListener("click", () => playPodcast(el.dataset.dir, Number(el.dataset.module)));
     } else if (act === "open-file") {
-      el.addEventListener("click", () => openTarget({ target: "file", dir: el.dataset.dir, kind: el.dataset.kind }));
+      el.addEventListener("click", () => openTarget({ target: "file", course: state.selectedDir, dir: el.dataset.dir, kind: el.dataset.kind }));
     } else if (act === "open-module") {
-      el.addEventListener("click", () => openTarget({ target: "module", dir: el.dataset.dir }));
+      el.addEventListener("click", () => openTarget({ target: "module", course: state.selectedDir, dir: el.dataset.dir }));
     } else if (act === "open-course") {
-      el.addEventListener("click", () => openTarget({ target: "course" }));
+      el.addEventListener("click", () => openTarget({ target: "course", course: state.selectedDir }));
     } else if (act === "reingest") {
       el.addEventListener("click", () => {
         const src = state.course && state.course.source;

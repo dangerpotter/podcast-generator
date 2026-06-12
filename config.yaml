@@ -5,7 +5,7 @@ llm:
   # Model preset: "12b" (default, best quality, ~6.3 GB, wants ~12 GB free RAM)
   # or "e4b" (lighter/faster for weak hardware, ~4.5B effective params).
   # Also selectable per run: capella-podcast --model e4b <command>
-  model: 12b
+  model: e4b
   # Advanced overrides (uncomment to pin a specific repo/quant/file; these
   # take precedence over the preset):
   #   repo_id: unsloth/gemma-4-12b-it-GGUF   # e.g. non-QAT alternate
@@ -15,7 +15,7 @@ llm:
   # Q4_0 exists there). Auxiliary GGUFs (MTP heads, mmproj) are never selected.
   cache_dir: models/        # local GGUF cache (gitignored)
   context_length: 8192      # working context per call (largest module digest ~6K tokens); model supports up to 256K
-  thinking_mode: false      # OFF by default for throughput; spec-confirmed toggle
+  thinking_mode: true      # OFF by default for throughput; spec-confirmed toggle
   sampling:                 # Gemma 4 recommended defaults
     temperature: 1.0
     top_p: 0.95
@@ -24,17 +24,15 @@ llm:
 
 tts:
   engine: kokoro            # Kokoro-82M v1.0 via the `kokoro` package (needs espeak-ng)
-  voices:                   # one distinct voice per host, order = HOST A, HOST B
-    - af_heart              # US English female
-    - am_michael            # US English male
-  speed: 1.0
+  voices: [af_heart, am_eric]   # one distinct voice per host, order = HOST A, HOST B
+  speed: 1.1
   sample_rate: 24000
   mp3_bitrate: 96k
 
 podcast:
   hosts: 2
   target_minutes_min: 3
-  target_minutes_max: 6
+  target_minutes_max: 5
 
 report:
   brand_color: "0F4761"     # deep teal for title + section headings
