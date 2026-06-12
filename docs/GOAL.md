@@ -138,9 +138,9 @@ Embedded llama.cpp via `llama-cpp-python`, loaded in-process. On first run, auto
   course-structure.json          # the intermediate from Stage 1
   manifest.json                  # what was generated, when, from which source
   week-01/  (or assessment-01/)
-    summary.docx
-    script.docx
-    podcast.mp3
+    cc_{courseID}_assessment_summary-NN.docx
+    cc_{courseID}_podcast_script-NN.docx
+    cc_{courseID}_podcast_overview-NN.mp3
   week-02/
     ...
 ```

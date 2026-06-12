@@ -11,14 +11,15 @@ from datetime import datetime
 from pathlib import Path
 
 from .. import ingest as ingest_mod, manifest
+from ..artifacts import artifact_filename
 from ..config import AppConfig
 from .jobs import Job
 
-#: stage key -> (artifact kind, output filename)
+#: stage key -> artifact kind
 STAGES = {
-    "summaries": ("summary", "summary.docx"),
-    "scripts": ("script", "script.docx"),
-    "podcasts": ("podcast", "podcast.mp3"),
+    "summaries": "summary",
+    "scripts": "script",
+    "podcasts": "podcast",
 }
 STAGE_ORDER = ("summaries", "scripts", "podcasts")
 
@@ -63,8 +64,9 @@ def run_stages(
     stages = [s for s in STAGE_ORDER if s in stages]
     work: list[tuple[str, dict]] = []
     for stage in stages:
-        _, fname = STAGES[stage]
+        kind = STAGES[stage]
         for m in modules:
+            fname = artifact_filename(structure["course"]["number"], kind, m["number"])
             out = course_dir / ingest_mod.module_dir_name(structure, m["number"]) / fname
             if only_missing and out.is_file():
                 continue
@@ -79,7 +81,7 @@ def run_stages(
     total, done = len(work), 0
     for stage, m in work:
         job.check_cancel()
-        kind, _ = STAGES[stage]
+        kind = STAGES[stage]
         job.set_progress(done, total, f"{kind} — {label_of(m)}")
         print(f"Generating {kind} for {label_of(m)}: {m['title']}")
         if stage == "summaries":
@@ -95,14 +97,18 @@ def run_stages(
                 runner = LlamaRunner(cfg)
             from ..script import generate_module_script
             out = generate_module_script(cfg, runner, structure, m, course_dir)
-            source = str(out.parent / "summary.docx")
+            source = str(out.parent / artifact_filename(
+                structure["course"]["number"], "summary", m["number"]
+            ))
         else:
             if tts is None:
                 from ..tts import KokoroTTS
                 tts = KokoroTTS(cfg)
             from ..podcast import generate_module_podcast
             out = generate_module_podcast(cfg, tts, structure, m, course_dir)
-            source = str(out.parent / "script.docx")
+            source = str(out.parent / artifact_filename(
+                structure["course"]["number"], "script", m["number"]
+            ))
         manifest.record(course_dir, kind, out, source=source, module=m["number"])
         done += 1
         job.set_progress(done, total, f"{kind} — {label_of(m)}")
@@ -153,8 +159,11 @@ def course_state(cfg: AppConfig, course_dir: Path) -> dict:
     for m in structure["modules"]:
         mdir = course_dir / ingest_mod.module_dir_name(structure, m["number"])
         arts = {
-            kind: _artifact_info(man, kind, m["number"], mdir / fname)
-            for kind, fname in STAGES.values()
+            kind: _artifact_info(
+                man, kind, m["number"],
+                mdir / artifact_filename(structure["course"]["number"], kind, m["number"]),
+            )
+            for kind in STAGES.values()
         }
         # Downstream artifact is stale when its upstream file is newer.
         for up, down in (("summary", "script"), ("script", "podcast")):
@@ -199,10 +208,13 @@ def list_courses(cfg: AppConfig) -> list[dict]:
             course = structure["course"]
             n_modules = len(structure["modules"])
             counts = {}
-            for kind, fname in STAGES.values():
+            for kind in STAGES.values():
                 counts[kind] = sum(
                     1 for m in structure["modules"]
-                    if (d / ingest_mod.module_dir_name(structure, m["number"]) / fname).is_file()
+                    if (
+                        d / ingest_mod.module_dir_name(structure, m["number"])
+                        / artifact_filename(course["number"], kind, m["number"])
+                    ).is_file()
                 )
             courses.append({
                 "dir": d.name,

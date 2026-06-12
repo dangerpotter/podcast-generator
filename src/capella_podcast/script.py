@@ -11,6 +11,7 @@ import re
 import sys
 from pathlib import Path
 
+from .artifacts import artifact_filename
 from .config import AppConfig
 from .docx_reader import HOST_PREFIX, read_docx_text, read_script_turns
 from .docx_render import SummaryDocBuilder
@@ -120,7 +121,9 @@ def generate_module_script(
 ) -> Path:
     n = module["number"]
     mod_dir = course_dir / module_dir_name(structure, n)
-    summary_path = mod_dir / "summary.docx"
+    summary_path = mod_dir / artifact_filename(
+        structure["course"]["number"], "summary", n
+    )
     if not summary_path.is_file():
         raise FileNotFoundError(
             f"{summary_path} not found. Generate summaries first "
@@ -130,7 +133,7 @@ def generate_module_script(
     summary_text = read_docx_text(summary_path)
     turns = generate_script_text(cfg, runner, structure, n, module["title"], summary_text)
 
-    out = mod_dir / "script.docx"
+    out = mod_dir / artifact_filename(structure["course"]["number"], "script", n)
     render_script_docx(cfg, out, structure, n, turns)
 
     problems = validate_docx(

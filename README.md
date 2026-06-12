@@ -93,7 +93,7 @@ served beyond your machine. From there you can ingest a course JSON (native
 file picker), generate or regenerate any stage per module or for the whole
 course, watch live progress logs, play podcasts in the browser, open the DOCX
 files in Word, and edit the common settings (model preset, voices, podcast
-length). Stale artifacts are flagged: if you edit a `summary.docx` in Word,
+length). Stale artifacts are flagged: if you edit an assessment summary DOCX in Word,
 the GUI shows an "edited" tag and offers one-click regeneration of the
 downstream script and podcast.
 
@@ -113,8 +113,11 @@ capella-podcast doctor                   # check all dependencies
 ```
 
 Artifacts land in `output/{course.number}/` (`course-structure.json`,
-`manifest.json`, and one `week-NN/` or `assessment-NN/` folder per module with
-`summary.docx`, `script.docx`, `podcast.mp3`).
+`manifest.json`, and one `week-NN/` or `assessment-NN/` folder per module).
+Generated filenames use the lowercase course ID and two-digit module number:
+`cc_{courseID}_assessment_summary-NN.docx`,
+`cc_{courseID}_podcast_script-NN.docx`, and
+`cc_{courseID}_podcast_overview-NN.mp3`.
 
 ### Choosing the model
 
@@ -136,9 +139,9 @@ overrides in config.yaml.
 
 ### Edit-and-regenerate loop
 
-Edit any generated `summary.docx` and run `regen --from-summary --module N` to
+Edit any generated assessment summary DOCX and run `regen --from-summary --module N` to
 rebuild that module's script and podcast from your edited report. Edit a
-`script.docx` and run `regen --from-script --module N` to rebuild only the MP3.
+podcast script DOCX and run `regen --from-script --module N` to rebuild only the MP3.
 Edited files are always re-parsed from disk; your wording is never reverted.
 
 ## Troubleshooting

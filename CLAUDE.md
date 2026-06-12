@@ -66,14 +66,14 @@ Key parsing differences from the standard export:
 ## Pipeline contract
 
 1. Ingest -> `output/{course.number}/course-structure.json` (the intermediate; the contract between stages).
-2. Summaries -> `summary.docx` per module (LLM writes from the intermediate).
-3. Scripts -> `script.docx` per module (LLM writes from the summary DOCX, NOT raw JSON, so report edits flow through). Two-host conversational, ~3 to 6 min. Mark speaker turns machine-parseably (`HOST A:` / `HOST B:` prefixes).
-4. Podcasts -> `podcast.mp3` per module (Kokoro reads the script, one voice per host, natural pauses).
+2. Summaries -> `cc_{courseID}_assessment_summary-NN.docx` per module (LLM writes from the intermediate).
+3. Scripts -> `cc_{courseID}_podcast_script-NN.docx` per module (LLM writes from the summary DOCX, NOT raw JSON, so report edits flow through). Two-host conversational, ~3 to 6 min. Mark speaker turns machine-parseably (`HOST A:` / `HOST B:` prefixes).
+4. Podcasts -> `cc_{courseID}_podcast_overview-NN.mp3` per module (Kokoro reads the script, one voice per host, natural pauses).
 
 ## Regeneration rules
 
-- `regen --from-summary --module N`: re-read the edited `summary.docx`, regenerate that module's script and mp3.
-- `regen --from-script --module N`: re-read the edited `script.docx`, regenerate only that module's mp3.
+- `regen --from-summary --module N`: re-read the edited assessment summary DOCX, regenerate that module's script and mp3.
+- `regen --from-script --module N`: re-read the edited podcast script DOCX, regenerate only that module's mp3.
 - Always parse the edited DOCX back from disk. Never use cached text. Editing must not silently revert the user's wording.
 
 ## Output layout
@@ -83,9 +83,9 @@ output/{course.number}/
   course-structure.json
   manifest.json
   week-01/ (or assessment-01/)
-    summary.docx
-    script.docx
-    podcast.mp3
+    cc_{courseID}_assessment_summary-NN.docx
+    cc_{courseID}_podcast_script-NN.docx
+    cc_{courseID}_podcast_overview-NN.mp3
 ```
 
 ## GUI

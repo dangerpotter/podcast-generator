@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .artifacts import artifact_filename
 from .config import AppConfig
 from .docx_reader import read_script_turns
 from .ingest import module_dir_name
@@ -24,7 +25,9 @@ def generate_module_podcast(
 ) -> Path:
     n = module["number"]
     mod_dir = course_dir / module_dir_name(structure, n)
-    script_path = mod_dir / "script.docx"
+    script_path = mod_dir / artifact_filename(
+        structure["course"]["number"], "script", n
+    )
     if not script_path.is_file():
         raise FileNotFoundError(
             f"{script_path} not found. Generate scripts first "
@@ -37,7 +40,7 @@ def generate_module_podcast(
             f"cannot synthesize audio."
         )
     audio = tts.synthesize_conversation(turns)
-    out = mod_dir / "podcast.mp3"
+    out = mod_dir / artifact_filename(structure["course"]["number"], "podcast", n)
     write_mp3(out, audio, SAMPLE_RATE)
 
     # Validate: the file must decode and have a sane duration.

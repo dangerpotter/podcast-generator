@@ -2,11 +2,11 @@
 
 Usage: python tests/test_regen.py output/SWK5017 1
 
-1. Edits script.docx (marker word), runs `regen --from-script`, asserts only
-   the MP3 regenerated and the edit survived on disk.
-2. Edits summary.docx (marker tip), runs `regen --from-summary`, asserts the
-   script and MP3 regenerated, the summary edit survived, and reports whether
-   the marker flowed into the new script.
+1. Edits the podcast script DOCX (marker word), runs `regen --from-script`,
+   asserts only the MP3 regenerated and the edit survived on disk.
+2. Edits the assessment summary DOCX (marker tip), runs `regen --from-summary`,
+   asserts the script and MP3 regenerated, the summary edit survived, and
+   reports whether the marker flowed into the new script.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from capella_podcast.docx_reader import read_docx_text, read_script_turns
+from capella_podcast.artifacts import artifact_filename
 
 PY = sys.executable
 MARKER_SCRIPT = "porcupine"
@@ -47,7 +48,9 @@ def main() -> None:
     assert mod_dirs, f"no module dir for module {n}"
     mod = mod_dirs[0]
     course = course_dir.name
-    summary, script, mp3 = mod / "summary.docx", mod / "script.docx", mod / "podcast.mp3"
+    summary = mod / artifact_filename(course, "summary", n)
+    script = mod / artifact_filename(course, "script", n)
+    mp3 = mod / artifact_filename(course, "podcast", n)
     failures: list[str] = []
 
     def check(cond, msg):
@@ -71,9 +74,9 @@ def main() -> None:
     t_mp3_before = mp3.stat().st_mtime
     time.sleep(1.1)
     run_cli("regen", "--from-script", "--module", str(n), "--course", course)
-    check(mp3.stat().st_mtime > t_mp3_before, "podcast.mp3 regenerated")
-    check(script.stat().st_mtime == t_script, "script.docx untouched by regen")
-    check(summary.stat().st_mtime == t_summary, "summary.docx untouched by regen")
+    check(mp3.stat().st_mtime > t_mp3_before, f"{mp3.name} regenerated")
+    check(script.stat().st_mtime == t_script, f"{script.name} untouched by regen")
+    check(summary.stat().st_mtime == t_summary, f"{summary.name} untouched by regen")
     turns_text = " ".join(t for _, t in read_script_turns(script))
     check(MARKER_SCRIPT in turns_text, "script edit survived on disk (not reverted)")
 
@@ -88,9 +91,9 @@ def main() -> None:
     t_mp3_before = mp3.stat().st_mtime
     time.sleep(1.1)
     run_cli("regen", "--from-summary", "--module", str(n), "--course", course)
-    check(script.stat().st_mtime > t_script_before, "script.docx regenerated")
-    check(mp3.stat().st_mtime > t_mp3_before, "podcast.mp3 regenerated")
-    check(summary.stat().st_mtime == t_summary, "summary.docx untouched by regen")
+    check(script.stat().st_mtime > t_script_before, f"{script.name} regenerated")
+    check(mp3.stat().st_mtime > t_mp3_before, f"{mp3.name} regenerated")
+    check(summary.stat().st_mtime == t_summary, f"{summary.name} untouched by regen")
     check(MARKER_SUMMARY.split()[2] in read_docx_text(summary), "summary edit survived on disk")
     new_script_text = " ".join(t for _, t in read_script_turns(script)).lower()
     flowed = "porcupine" in new_script_text

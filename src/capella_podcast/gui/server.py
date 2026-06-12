@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .. import __version__, ingest as ingest_mod
+from ..artifacts import artifact_filename
 from ..config import DEFAULT_CONFIG_NAME, MODEL_PRESETS, load_config, select_model
 from . import actions
 from .config_edit import ConfigEditError, apply_settings
@@ -35,7 +36,6 @@ MIME = {
     ".ico": "image/x-icon",
 }
 
-ARTIFACT_FILES = {"summary": "summary.docx", "script": "script.docx", "podcast": "podcast.mp3"}
 ARTIFACT_MIME = {
     "summary": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "script": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -176,13 +176,17 @@ class Handler(BaseHTTPRequestHandler):
         course = (q.get("course") or [""])[0]
         mdir = (q.get("dir") or [""])[0]
         kind = (q.get("kind") or [""])[0]
-        if kind not in ARTIFACT_FILES:
+        if kind not in ARTIFACT_MIME:
             raise ValueError(f"bad kind: {kind!r}")
         if not _MODULE_DIR.match(mdir):
             raise ValueError(f"bad module dir: {mdir!r}")
         cfg = self.state.cfg()
         course_dir = self.state.course_dir(cfg, course)
-        path = course_dir / mdir / ARTIFACT_FILES[kind]
+        structure = ingest_mod.load_structure(course_dir)
+        module_number = int(mdir.rsplit("-", 1)[1])
+        path = course_dir / mdir / artifact_filename(
+            structure["course"]["number"], kind, module_number
+        )
         if not path.is_file():
             raise FileNotFoundError(f"{path.name} not generated yet for {mdir}")
         return path, kind
@@ -211,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
                 if (q.get("download") or ["0"])[0] == "1":
                     course = (q.get("course") or [""])[0]
                     mdir = (q.get("dir") or [""])[0]
-                    name = f"{course}-{mdir}-{ARTIFACT_FILES[kind]}"
+                    name = path.name
                 self._send_file(path, ARTIFACT_MIME[kind], download_name=name)
             elif route == "/api/logo":
                 self._get_logo()

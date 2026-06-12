@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, ingest as ingest_mod, manifest
+from .artifacts import artifact_filename
 from .config import MODEL_PRESETS, load_config, select_model
 
 
@@ -105,7 +106,9 @@ def cmd_scripts(cfg, args):
             mod_dir = out.parent
             manifest.record(
                 course_dir, "script", out,
-                source=str(mod_dir / "summary.docx"), module=m["number"],
+                source=str(mod_dir / artifact_filename(
+                    structure["course"]["number"], "summary", m["number"]
+                )), module=m["number"],
             )
     except (ModelProvisioningError, FileNotFoundError) as e:
         sys.exit(f"ERROR: {e}")
@@ -125,7 +128,9 @@ def cmd_podcasts(cfg, args):
             out = generate_module_podcast(cfg, tts, structure, m, course_dir)
             manifest.record(
                 course_dir, "podcast", out,
-                source=str(out.parent / "script.docx"), module=m["number"],
+                source=str(out.parent / artifact_filename(
+                    structure["course"]["number"], "script", m["number"]
+                )), module=m["number"],
             )
     except (TTSDependencyError, FileNotFoundError) as e:
         sys.exit(f"ERROR: {e}")

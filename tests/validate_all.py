@@ -2,9 +2,9 @@
 
 Usage: python tests/validate_all.py output/SWK5017 [output/HMSV-FPX8220 ...]
 
-Checks, per module: summary.docx (layout + section set), script.docx
-(parseable two-host turns), podcast.mp3 (decodes, sane duration), and that
-the manifest records every artifact.
+Checks, per module: assessment summary DOCX (layout + section set), podcast
+script DOCX (parseable two-host turns), podcast overview MP3 (decodes, sane
+duration), and that the manifest records every artifact.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import soundfile as sf
 
+from capella_podcast.artifacts import artifact_filename
 from capella_podcast.docx_reader import read_script_turns
 from capella_podcast.docx_validate import validate_docx
 from capella_podcast.summary import FPX_HEADINGS, GP_HEADINGS
@@ -40,37 +41,37 @@ def validate_course(course_dir: Path, failures: list[str]) -> None:
     for m in structure["modules"]:
         n = m["number"]
         mod_dir = course_dir / f"{course['module_dir_prefix']}-{n:02d}"
-        summary = mod_dir / "summary.docx"
-        script = mod_dir / "script.docx"
-        mp3 = mod_dir / "podcast.mp3"
+        summary = mod_dir / artifact_filename(course["number"], "summary", n)
+        script = mod_dir / artifact_filename(course["number"], "script", n)
+        mp3 = mod_dir / artifact_filename(course["number"], "podcast", n)
 
         problems = validate_docx(
             summary, expected_headings=headings,
             title=f"{title_word}: {course['module_label']} {n}" if False else None,
             min_hyperlinks=1, expect_logo=True, course_number=course["number"],
         ) if summary.is_file() else ["missing"]
-        check(not problems, f"{mod_dir.name}/summary.docx valid ({'; '.join(problems) or 'ok'})", failures)
+        check(not problems, f"{mod_dir.name}/{summary.name} valid ({'; '.join(problems) or 'ok'})", failures)
 
         if script.is_file():
             turns = read_script_turns(script)
             hosts = {h for h, _ in turns}
             words = sum(len(t.split()) for _, t in turns)
             check(len(turns) >= 6 and hosts == {"HOST A", "HOST B"},
-                  f"{mod_dir.name}/script.docx: {len(turns)} turns, hosts {sorted(hosts)}", failures)
-            check(words >= 300, f"{mod_dir.name}/script.docx: {words} words", failures)
+                  f"{mod_dir.name}/{script.name}: {len(turns)} turns, hosts {sorted(hosts)}", failures)
+            check(words >= 300, f"{mod_dir.name}/{script.name}: {words} words", failures)
         else:
-            check(False, f"{mod_dir.name}/script.docx exists", failures)
+            check(False, f"{mod_dir.name}/{script.name} exists", failures)
 
         if mp3.is_file():
             try:
                 info = sf.info(str(mp3))
                 dur = info.frames / info.samplerate
                 check(60 <= dur <= 900 and info.samplerate >= 24000,
-                      f"{mod_dir.name}/podcast.mp3: {dur/60:.1f} min @ {info.samplerate} Hz", failures)
+                      f"{mod_dir.name}/{mp3.name}: {dur/60:.1f} min @ {info.samplerate} Hz", failures)
             except Exception as e:
-                check(False, f"{mod_dir.name}/podcast.mp3 decodes ({e})", failures)
+                check(False, f"{mod_dir.name}/{mp3.name} decodes ({e})", failures)
         else:
-            check(False, f"{mod_dir.name}/podcast.mp3 exists", failures)
+            check(False, f"{mod_dir.name}/{mp3.name} exists", failures)
 
         for kind in ("summary", "script", "podcast"):
             key = f"{kind}:module-{n:02d}"

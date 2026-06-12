@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .artifacts import artifact_filename
 from .config import AppConfig
 from .docx_render import Bullet, Section, find_logo, render_summary_docx
 from .docx_validate import validate_docx
@@ -204,7 +205,9 @@ def generate_module_summary(
     sections = build_sections(structure, module, content)
     title = summary_title(cfg, structure, module["number"])
     subtitle = f"{course['number']} - {course['name']}"
-    out = course_dir / module_dir_name(structure, module["number"]) / "summary.docx"
+    out = course_dir / module_dir_name(structure, module["number"]) / artifact_filename(
+        course["number"], "summary", module["number"]
+    )
     render_summary_docx(cfg, out, title, subtitle, course["number"], sections)
 
     headings = GP_HEADINGS if course["type"] == "GP" else FPX_HEADINGS
