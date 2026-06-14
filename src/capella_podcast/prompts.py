@@ -13,12 +13,14 @@ Hard rules:
   deadlines, percentages, grade weights, resource names, links, tools, or
   people. If a fact is not in the source, leave it out.
 - Plain, warm, professional tone. Address the student as "you".
+- Always refer to academic staff as "faculty" — never "instructor", "teacher",
+  or "professor".
 - No markdown, no HTML. Plain sentences only.
 - Reply with ONLY a single JSON object exactly matching the requested shape.
 """
 
 GP_SUMMARY_USER = """\
-Course: {course_number} - {course_name} (instructor-led Guided Path)
+Course: {course_number} - {course_name} (faculty-led Guided Path)
 Module: Week {n} - {title}
 
 === WEEK INTRODUCTION ===
@@ -66,7 +68,7 @@ Write the content for this assessment's summary report. Reply with ONLY this JSO
     {{"topic": "Short topic name", "description": "1-2 sentences about what the study resources for this assessment cover, from the source."}}
   ],
   "ways_to_connect": [
-    {{"name": "Connection channel named in the source (discussion community, live sessions, instructor contact...)", "description": "1-2 sentences on how it helps."}}
+    {{"name": "Connection channel named in the source (discussion community, live sessions, faculty contact...)", "description": "1-2 sentences on how it helps."}}
   ],
   "tips": [
     {{"tip": "Short imperative phrase", "description": "1-2 actionable sentences helping the learner succeed on this assessment."}}
@@ -89,6 +91,8 @@ Hard rules:
 - The ONLY source of facts is the module summary report provided. Never invent
   dates, deadlines, percentages, grade weights, resources, links, or names.
   If the report does not state a fact, the hosts do not say it.
+- Always refer to academic staff as "faculty" — never "instructor", "teacher",
+  or "professor".
 - Exactly two speakers: HOST A and HOST B.
 - EVERY line of the script must start with "HOST A: " or "HOST B: " — one
   speaker turn per line, nothing else. No titles, no headings, no music cues,

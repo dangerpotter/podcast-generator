@@ -179,7 +179,7 @@ def build_sections(structure: dict, module: dict, content: dict) -> list[Section
         ),
         Section("Recommended Resources", bullets=resource_bullets(resources, descriptions)),
         Section("Ways to Connect", bullets=connect or [Bullet(
-            "Your instructor",
+            "Your faculty",
             "Reach out through the courseroom whenever you have questions about this assessment.",
         )]),
         Section("Tips for Success", bullets=tips),

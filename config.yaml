@@ -17,15 +17,15 @@ llm:
   context_length: 8192      # working context per call (largest module digest ~6K tokens); model supports up to 256K
   thinking_mode: true      # OFF by default for throughput; spec-confirmed toggle
   sampling:                 # Gemma 4 recommended defaults
-    temperature: 1.0
+    temperature: 0.95
     top_p: 0.95
     top_k: 64
   ram_warn_gb: 12           # warn / suggest E4B fallback below this much free RAM
 
 tts:
   engine: kokoro            # Kokoro-82M v1.0 via the `kokoro` package (needs espeak-ng)
-  voices: [af_heart, am_eric]   # one distinct voice per host, order = HOST A, HOST B
-  speed: 1.1
+  voices: [af_heart, am_puck]   # one distinct voice per host, order = HOST A, HOST B
+  speed: 1.15
   sample_rate: 24000
   mp3_bitrate: 96k
 

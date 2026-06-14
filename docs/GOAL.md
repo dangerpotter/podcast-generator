@@ -29,7 +29,7 @@ Detect FlexPath vs Guided Path from the JSON, do not ask the user:
 
 - `course.courseDesignModelType`: `"GUIDED_PATH2"` for Guided Path, `"FLEX_PATH2"` for FlexPath.
 - Cross-check with `course.flexPathAny` (`true` for FlexPath, `false` for GP).
-- Guided Path: instructor-led, modules are WEEKS, typically 10 units, `unit.duration` is 1.
+- Guided Path: faculty-led, modules are WEEKS, typically 10 units, `unit.duration` is 1.
 - FlexPath: self-paced, modules are ASSESSMENTS, up to 10 units but often fewer (sample has 4), `unit.duration` is 0.
 
 If the two fields disagree or the value is unrecognized, stop and report it clearly rather than guessing.
