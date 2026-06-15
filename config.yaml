@@ -15,7 +15,7 @@ llm:
   # Q4_0 exists there). Auxiliary GGUFs (MTP heads, mmproj) are never selected.
   cache_dir: models/        # local GGUF cache (gitignored)
   context_length: 8192      # working context per call (largest module digest ~6K tokens); model supports up to 256K
-  thinking_mode: true      # OFF by default for throughput; spec-confirmed toggle
+  thinking_mode: false     # OFF by default for throughput; spec-confirmed toggle
   sampling:                 # Gemma 4 recommended defaults
     temperature: 0.95
     top_p: 0.95

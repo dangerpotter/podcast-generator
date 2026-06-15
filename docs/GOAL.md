@@ -179,5 +179,5 @@ Embedded llama.cpp via `llama-cpp-python`, loaded in-process. On first run, auto
 
 1. **FPX titling** — Implemented as `Assessment Summary: Assessment {N}` (configurable via `report.fpx_title_template` in config.yaml). Confirm with requester whether this or "Weekly Summary" is preferred.
 2. **Podcast length** — Defaulted to 3–6 minutes (configurable via `podcast.target_minutes_min/max`). ✓ Implemented.
-3. **Kokoro voice selection** — Defaulted to `af_heart` (US female) and `am_michael` (US male), configurable via `tts.voices` in config.yaml and the GUI settings page. ✓ Implemented.
+3. **Kokoro voice selection** — Defaulted to `af_heart` (US female) and `am_puck` (US male), configurable via `tts.voices` in config.yaml and the GUI settings page. ✓ Implemented.
 4. **Target hardware floor** — Default model is 12B QAT (~6.3 GB, ~12 GB free RAM needed). E4B preset (~4.8 GB) is the documented fallback for 8 GB machines, selectable via `--model e4b` or `llm.model: e4b` in config.yaml. `capella-podcast doctor` checks available RAM and warns. ✓ Implemented.
