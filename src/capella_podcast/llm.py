@@ -16,7 +16,14 @@ import psutil
 
 from .config import AppConfig
 
-_THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+# Gemma 4 thinking blocks: <|channel>thought\n...<channel|>
+# Generic fallback: <think>...</think> (used by some GGUF builds)
+_THINK_BLOCK = re.compile(
+    r"(<\|channel>thought\n.*?<channel\|>|<think>.*?</think>)\s*",
+    re.DOTALL,
+)
+
+_THINKING_PREFIX = "<|think|>\n"
 
 
 class ModelProvisioningError(Exception):
@@ -223,11 +230,17 @@ class LlamaRunner:
                       file=sys.stderr, flush=True)
         raise ModelProvisioningError(f"Could not load {model_path.name}: {last_err}")
 
+    def _apply_thinking(self, system: str) -> str:
+        """Prepend the Gemma 4 thinking trigger to the system prompt when enabled."""
+        if self.cfg.llm.thinking_mode:
+            return _THINKING_PREFIX + system
+        return system
+
     def chat_json(self, system: str, user: str, max_tokens: int = 2048) -> dict:
         """One chat round constrained to a JSON object; parsed and returned."""
         llama = self.load()
         messages = [
-            {"role": "system", "content": system},
+            {"role": "system", "content": self._apply_thinking(system)},
             {"role": "user", "content": user},
         ]
         last_err: Exception | None = None
@@ -256,7 +269,7 @@ class LlamaRunner:
         llama = self.load()
         out = llama.create_chat_completion(
             messages=[
-                {"role": "system", "content": system},
+                {"role": "system", "content": self._apply_thinking(system)},
                 {"role": "user", "content": user},
             ],
             max_tokens=max_tokens,
